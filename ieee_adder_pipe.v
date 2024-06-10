@@ -1,26 +1,13 @@
-/* Name: Suhas Sunil Raut    SJSU ID: 011432980
-   Verilog Code For IEEE 754 Single Precision (32 bit) Floating Point Adder
-   
-   This is a reduced complexity floating point adder.   
-   NaN, overflow, underflow and infinity values not processed
-   
-   Format for IEEE 754 SP FP:
-   S    Exp     Mantissa
-   31   30:23   22:0     
-
-   Note: Number = 0 for exp=0 and mantissa=0
-*/
-
 `timescale 1ns/10ps
 
-module IEEE_SP_FP_ADDER(input clk, input reset, input [31:0]Number1, input [31:0]Number2, output [31:0]Result);
+module IEEE_SP_FP_ADDER(input clk, input rst, input [31:0]Number1, input [31:0]Number2, output [31:0]Result);
     
     reg    [31:0] Num_shift_80,Num_shift_pipe2_80; 
     reg    [7:0]  Larger_exp_80,Larger_exp_pipe1_80,Larger_exp_pipe2_80,Larger_exp_pipe3_80,Larger_exp_pipe4_80,Larger_exp_pipe5_80,Final_expo_80;
-    reg    [22:0] Small_exp_mantissa_80,Small_exp_mantissa_pipe2_80,S_exp_mantissa_pipe2_80,S_exp_mantissa_pipe3_80,Small_exp_mantissa_pipe3_80;
+    reg    [22:0] Small_exp_mantissa_80,Small_exp_mantissa_pipe2_80,S_exp_mantissa_pipe2_80,S_exp_mantissa_pipe3_80;
     reg    [22:0] S_mantissa_80,L_mantissa_80;
     reg    [22:0] L1_mantissa_pipe2_80,L1_mantissa_pipe3_80,Large_mantissa_80,Final_mant_80;
-    reg    [22:0] Large_mantissa_pipe2_80,Large_mantissa_pipe3_80,S_mantissa_pipe4_80,L_mantissa_pipe4_80;
+    reg    [22:0] Large_mantissa_pipe2_80,S_mantissa_pipe4_80,L_mantissa_pipe4_80;
     reg    [23:0] Add_mant_80,Add1_mant_80,Add_mant_pipe5_80;
     reg    [7:0]  e1_80,e1_pipe1_80,e1_pipe2_80,e1_pipe3_80,e1_pipe4_80,e1_pipe5_80;
     reg    [7:0]  e2_80,e2_pipe1_80,e2_pipe2_80,e2_pipe3_80,e2_pipe4_80,e2_pipe5_80;
@@ -30,7 +17,7 @@ module IEEE_SP_FP_ADDER(input clk, input reset, input [31:0]Number1, input [31:0
     reg           s1_80,s2_80,Final_sign_80,s1_pipe1_80,s1_pipe2_80,s1_pipe3_80,s1_pipe4_80,s1_pipe5_80;
     reg           s2_pipe1_80,s2_pipe2_80,s2_pipe3_80,s2_pipe4_80,s2_pipe5_80;
     reg    [3:0]     renorm_shift_80,renorm_shift_pipe5_80;
-    integer signed   renorm_exp_80;
+    integer signed   renorm_exp_80,renorm_exp_pipe5_80;
 
     //:w
     //reg    [3:0]  renorm_exp_80,renorm_exp_pipe5_80;
@@ -38,24 +25,24 @@ module IEEE_SP_FP_ADDER(input clk, input reset, input [31:0]Number1, input [31:0
 
     assign Result = Result_80;
 
-    always @(*) begin
+    always @(posedge clk) begin
         ///////////////////////// Combinational stage1 ///////////////////////////
-	e1_80 = Number1[30:23];
-	e2_80 = Number2[30:23];
-        m1_80 = Number1[22:0];
-	m2_80 = Number2[22:0];
-	s1_80 = Number1[31];
-	s2_80 = Number2[31];
-        
+	e1_80 <= Number1[30:23];
+	e2_80 <= Number2[30:23];
+    m1_80 <= Number1[22:0];
+	m2_80 <= Number2[22:0];
+	s1_80 <= Number1[31];
+	s2_80 <= Number2[31]; 
+	
         if (e1_80  > e2_80) begin
             Num_shift_80           = e1_80 - e2_80;              // determine number of mantissa shift
-            Larger_exp_80           = e1_80;                     // store higher exponent
+            Larger_exp_80          = e1_80;                     // store higher exponent
             Small_exp_mantissa_80  = m2_80;
             Large_mantissa_80      = m1_80;
         end 
         else begin
             Num_shift_80           = e2_80 - e1_80;
-            Larger_exp_80           = e2_80;
+            Larger_exp_80          = e2_80;
             Small_exp_mantissa_80  = m1_80;
             Large_mantissa_80      = m2_80;
         end
@@ -66,27 +53,29 @@ module IEEE_SP_FP_ADDER(input clk, input reset, input [31:0]Number1, input [31:0
 	else begin
 	    Num_shift_80 = Num_shift_80;
 	end	
+	
+	
         ///////////////////////// Combinational stage2 ///////////////////////////
         //right shift mantissa of smaller exponent
 	if (e1_pipe2_80 != 0) begin
-            S_exp_mantissa_pipe2_80  = {1'b1,Small_exp_mantissa_pipe2_80[22:1]};
-	    S_exp_mantissa_pipe2_80  = (S_exp_mantissa_pipe2_80 >> Num_shift_pipe2_80);
+        S_exp_mantissa_pipe2_80  = {1'b1,Small_exp_mantissa_pipe2_80[22:1]}>> Num_shift_pipe2_80;
+//	    S_exp_mantissa_pipe2_80  = (S_exp_mantissa_pipe2_80 );
         end
 	else begin
 	    S_exp_mantissa_pipe2_80 = Small_exp_mantissa_pipe2_80;
 	end
 
-	if (e2_80!= 0) begin
+	if (e2_pipe2_80!= 0) begin
             L1_mantissa_pipe2_80      = {1'b1,Large_mantissa_pipe2_80[22:1]};
 	end
 	else begin
 	    L1_mantissa_pipe2_80 = Large_mantissa_pipe2_80;
 	end	
-        ///////////////////////// Combinational stage3 ///////////////////////////
+//        ///////////////////////// Combinational stage3 ///////////////////////////
 	//compare which is smaller mantissa
         if (S_exp_mantissa_pipe3_80  < L1_mantissa_pipe3_80) begin
                 S_mantissa_80 = S_exp_mantissa_pipe3_80;
-		L_mantissa_80 = L1_mantissa_pipe3_80;
+		        L_mantissa_80 = L1_mantissa_pipe3_80;
         end
         else begin 
 		S_mantissa_80 = L1_mantissa_pipe3_80;
@@ -96,7 +85,7 @@ module IEEE_SP_FP_ADDER(input clk, input reset, input [31:0]Number1, input [31:0
         //add the two mantissa's
 	if (e1_pipe4_80!=0 & e2_pipe4_80!=0) begin
 		if (s1_pipe4_80 == s2_pipe4_80) begin
-        		Add_mant_80 = S_mantissa_pipe4_80 + L_mantissa_pipe4_80;
+        	Add_mant_80 = S_mantissa_pipe4_80 + L_mantissa_pipe4_80;
 		end else begin
 			Add_mant_80 = L_mantissa_pipe4_80 - S_mantissa_pipe4_80;
 		end
@@ -128,9 +117,10 @@ module IEEE_SP_FP_ADDER(input clk, input reset, input [31:0]Number1, input [31:0
         else begin
 		renorm_exp_80 = 0;
 	end	
+ 
 	///////////////////////// Combinational stage5 /////////////////////////////
 	//Shift the mantissa as required; re-normalize exp; determine sign
-        Final_expo_80 =  Larger_exp_pipe5_80 + renorm_exp_80;
+        Final_expo_80 =  Larger_exp_pipe5_80 + renorm_exp_pipe5_80;
 	if (renorm_shift_pipe5_80 != 0) begin	
 		Add1_mant_80 = Add_mant_pipe5_80 << renorm_shift_pipe5_80;
 	end
@@ -143,7 +133,7 @@ module IEEE_SP_FP_ADDER(input clk, input reset, input [31:0]Number1, input [31:0
 	end 
 	if (e1_pipe5_80 > e2_pipe5_80) begin
 		Final_sign_80 = s1_pipe5_80;	
-	end else if (e2_80 > e1_80) begin
+	end else if (e2_pipe5_80 > e1_pipe5_80) begin
 		Final_sign_80 = s2_pipe5_80;
 	end
 	else begin
@@ -153,11 +143,11 @@ module IEEE_SP_FP_ADDER(input clk, input reset, input [31:0]Number1, input [31:0
 			Final_sign_80 = s2_pipe5_80;
 		end
 	end	
-	Result_80 = {Final_sign_80,Final_expo_80,Final_mant_80}; 
+	Result_80  = {Final_sign_80,Final_expo_80,Final_mant_80}; 
     end
     
     always @(posedge clk) begin
-            if(reset) begin                           //reset all reg at reset signal
+            if(rst) begin                           //rst all reg at rst signal
                 s1_pipe2_80 <=   0;
 		s2_pipe2_80 <=   0;
 		e1_pipe2_80 <=   0;
@@ -165,7 +155,7 @@ module IEEE_SP_FP_ADDER(input clk, input reset, input [31:0]Number1, input [31:0
 		m1_pipe2_80 <=   0;
 		m2_pipe2_80 <=   0;
 		Larger_exp_pipe2_80 <=   0;
-		//stage2
+//		//stage2
 		Small_exp_mantissa_pipe2_80 <=   0;
 	        Large_mantissa_pipe2_80     <=   0;
 		Num_shift_pipe2_80          <=   0;
@@ -190,15 +180,16 @@ module IEEE_SP_FP_ADDER(input clk, input reset, input [31:0]Number1, input [31:0
 		m1_pipe5_80 <=   0;
 		m2_pipe5_80 <=   0;
 		Larger_exp_pipe5_80 <= 0; 
-		//stage3	
+//		//stage3	
 		S_exp_mantissa_pipe3_80  <= 0;
 	       	L1_mantissa_pipe3_80     <= 0;
-		//stage4
+//		//stage4
 		S_mantissa_pipe4_80       <= 0;
 		L_mantissa_pipe4_80       <= 0;	
-		//stage5	
+//		//stage5	
 		Add_mant_pipe5_80 <= 0;
 		renorm_shift_pipe5_80 <= 0;
+		renorm_exp_pipe5_80<=0;
 		Result_80 <=0;
             end
 	    else begin        
@@ -211,7 +202,7 @@ module IEEE_SP_FP_ADDER(input clk, input reset, input [31:0]Number1, input [31:0
 		m1_pipe2_80 <=   m1_80;
 		m2_pipe2_80 <=   m2_80;
 		Larger_exp_pipe2_80 <=   Larger_exp_80;
-		//stage2
+//		//stage2
 		Small_exp_mantissa_pipe2_80 <=   Small_exp_mantissa_80;
 	        Large_mantissa_pipe2_80     <=   Large_mantissa_80;
 		Num_shift_pipe2_80          <=   Num_shift_80;
@@ -236,16 +227,16 @@ module IEEE_SP_FP_ADDER(input clk, input reset, input [31:0]Number1, input [31:0
 		m1_pipe5_80 <=   m1_pipe4_80;
 		m2_pipe5_80 <=   m2_pipe4_80;
 		Larger_exp_pipe5_80 <=   Larger_exp_pipe4_80; 
-		//stage3	
+//		//stage3	
 		S_exp_mantissa_pipe3_80  <= S_exp_mantissa_pipe2_80;
-	       	L1_mantissa_pipe3_80     <= L1_mantissa_pipe2_80;
-		//stage4
+	    L1_mantissa_pipe3_80     <= L1_mantissa_pipe2_80;
+//		//stage4
 		S_mantissa_pipe4_80         <=   S_mantissa_80;
 		L_mantissa_pipe4_80         <=   L_mantissa_80;	
-		//stage5	
+//		//stage5	
 		Add_mant_pipe5_80 <= Add_mant_80;
 		renorm_shift_pipe5_80 <= renorm_shift_80;
-		//renorm_exp_pipe5_80 <= renorm_exp_80;		
+		renorm_exp_pipe5_80 <= renorm_exp_80;		
 	   end
     end
     
